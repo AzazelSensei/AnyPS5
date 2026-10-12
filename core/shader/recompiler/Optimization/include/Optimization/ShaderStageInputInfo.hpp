@@ -166,6 +166,7 @@ struct ShaderPixelInputInfo {
     bool psNoPerspective = false;
     bool psPixelKillEnable = false;
     bool psDepthExportEnable = false;
+    bool psStencilExportEnable = false;
     bool psSampleMaskExportEnable = false;
     bool psSampleShading = false;
     bool psEarlyZ = false;

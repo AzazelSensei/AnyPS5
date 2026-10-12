@@ -1298,6 +1298,12 @@ void EmitSetAttribute(SpirvValueEmitContext& ctx, const IrValue& inst) {
                 state.module.AddFunction(spv::OpBitcast, TypeF32(state), f32, raw);
                 state.module.AddFunction(spv::OpStore, state.depthVariable, f32);
             }
+            if ((exp.en & 2u) != 0u && state.stencilVariable != 0u) {
+                const auto raw = ExportRawComponent(ctx, data, 1);
+                const auto i32 = state.module.AllocateId();
+                state.module.AddFunction(spv::OpBitcast, TypeI32(state), i32, raw);
+                state.module.AddFunction(spv::OpStore, state.stencilVariable, i32);
+            }
             if ((exp.en & 4u) != 0u && state.sampleMaskVariable != 0u) {
                 const auto raw = ExportRawComponent(ctx, data, 2);
                 const auto value = state.module.AllocateId();

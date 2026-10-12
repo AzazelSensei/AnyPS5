@@ -405,6 +405,9 @@ void CollectOutputs(const IrProgram& program, ShaderStageInputInfo inputInfo, Sh
                 if (program.Resources().stage == IrShaderStage::Pixel && (exportInfo.en & 0x1u) != 0u && inputInfo.pixel->psDepthExportEnable) {
                     AddOutput(info, StageOutputKind::Depth, 0, 0, "gl_FragDepth");
                 }
+                if (program.Resources().stage == IrShaderStage::Pixel && (exportInfo.en & 0x2u) != 0u && inputInfo.pixel->psStencilExportEnable) {
+                    AddOutput(info, StageOutputKind::Stencil, 0, 0, "gl_FragStencilRefARB");
+                }
                 if (program.Resources().stage == IrShaderStage::Pixel && (exportInfo.en & 0x4u) != 0u && inputInfo.pixel->psSampleMaskExportEnable) {
                     AddOutput(info, StageOutputKind::SampleMask, 0, 0, "gl_SampleMask");
                 }

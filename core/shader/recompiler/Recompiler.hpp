@@ -131,6 +131,7 @@ struct ShaderPixelStageInfo {
     bool linearCentroid;
     bool pixelKillEnable;
     bool depthExportEnable;
+    bool stencilExportEnable;
     bool sampleMaskExportEnable;
     bool earlyZ;
     bool executeOnNoop;

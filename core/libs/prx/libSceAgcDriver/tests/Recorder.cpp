@@ -241,6 +241,8 @@ public:
                 robustness.pNext = address.pNext;
                 address.pNext = &robustness;
             }
+            stencilExportSupported = hasExtension(VK_EXT_SHADER_STENCIL_EXPORT_EXTENSION_NAME);
+            if (stencilExportSupported) extensionsEnabled.push_back(VK_EXT_SHADER_STENCIL_EXPORT_EXTENSION_NAME);
             VkDeviceCreateInfo device{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, &address};
             device.queueCreateInfoCount = 1;
             device.pQueueCreateInfos = &queue;
@@ -299,6 +301,7 @@ private:
     Context context{};
     bool graphics = false;
     bool nullDescriptors = false;
+    bool stencilExportSupported = false;
 };
 
 using Kind = Recorder::ReadKind;
