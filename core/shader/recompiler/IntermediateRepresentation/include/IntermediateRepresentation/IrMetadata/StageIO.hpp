@@ -50,6 +50,7 @@ enum class StageOutputKind {
     Parameter,
     Mrt,
     Depth,
+    Stencil,
     SampleMask,
     PointSize,
     ClipDistance,

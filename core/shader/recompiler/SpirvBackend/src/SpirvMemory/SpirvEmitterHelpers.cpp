@@ -356,6 +356,11 @@ void DefineOutputs(SpirvEmitterState& state) {
         case StageOutputKind::Depth:
             binding.variableId = BuiltIn(state.depthVariable, TypeF32(state), "gl_FragDepth", spv::BuiltInFragDepth);
             break;
+        case StageOutputKind::Stencil:
+            binding.variableId = BuiltIn(state.stencilVariable, TypeI32(state), "gl_FragStencilRefARB", spv::BuiltInFragStencilRefEXT);
+            state.module.EmitCapability(spv::CapabilityStencilExportEXT);
+            state.module.EmitExtension("SPV_EXT_shader_stencil_export");
+            break;
         case StageOutputKind::SampleMask:
             binding.variableId = BuiltIn(state.sampleMaskVariable, SampleMaskArrayType(state), "gl_SampleMask", spv::BuiltInSampleMask);
             break;

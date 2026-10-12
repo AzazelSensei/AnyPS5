@@ -141,6 +141,7 @@ ShaderRecompiler::ShaderPixelStageInfo DecodePixelStageInfo(const Registers& con
     }
     const bool pixelKillEnable = ((shaderControl >> 6u) & 0x1u) != 0;
     const bool depthExportEnable = (shaderControl & 0x1u) != 0;
+    const bool stencilExportEnable = ((shaderControl >> 1u) & 0x1u) != 0;
     const bool sampleMaskExportEnable = ((shaderControl >> 8u) & 0x1u) != 0;
     const auto zOrder = (shaderControl >> 4u) & 0x3u;
     const auto loaded = [&](PixelInput input) { return (activeInputs & PixelInputBit(input)) != 0; };
@@ -162,8 +163,9 @@ ShaderRecompiler::ShaderPixelStageInfo DecodePixelStageInfo(const Registers& con
         .linearCentroid = loaded(PixelInput::LinearCentroid),
         .pixelKillEnable = pixelKillEnable,
         .depthExportEnable = depthExportEnable,
+        .stencilExportEnable = stencilExportEnable,
         .sampleMaskExportEnable = sampleMaskExportEnable,
-        .earlyZ = zOrder == 1u && !pixelKillEnable && !depthExportEnable && !sampleMaskExportEnable,
+        .earlyZ = zOrder == 1u && !pixelKillEnable && !depthExportEnable && !stencilExportEnable && !sampleMaskExportEnable,
         .executeOnNoop = ((shaderControl >> 10u) & 0x1u) != 0,
         .conservativeZExport = static_cast<ShaderRecompiler::ConservativeZExport>(conservativeZExport),
         .orderedPixelShader = ((shaderControl >> 16u) & 0x1u) != 0,

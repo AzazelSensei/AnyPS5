@@ -1332,6 +1332,7 @@ void depthMaintenanceTests() {
 // formats the export path does not lay out are refused. A missing 0x1c4 gives no verdict here.
 void ZExportTests() {
     constexpr std::uint32_t zExportEnable = 0x1u;
+    constexpr std::uint32_t stencilExportEnable = 0x2u;
     constexpr std::uint32_t maskExportEnable = 0x100u;
     const auto withExports = [](std::uint32_t format, std::uint32_t exports) {
         auto queue = makeState();
@@ -1346,6 +1347,14 @@ void ZExportTests() {
         Require(AgcDriver::Graphics::DrawRejection(queue, true).empty(), "a Z export with format " + std::to_string(format) + " was rejected");
     }
     Require(!AgcDriver::Graphics::DrawRejection(withExports(0, zExportEnable), true).empty(), "a Z export without a Z format was accepted");
+    for (const std::uint32_t format : {2u, 9u}) {
+        const auto queue = withExports(format, stencilExportEnable);
+        Require(AgcDriver::Graphics::DrawRejection(queue, true).empty(), "a stencil export with format " + std::to_string(format) + " was rejected");
+    }
+    for (const std::uint32_t format : {0u, 1u, 3u}) {
+        const auto queue = withExports(format, stencilExportEnable);
+        Require(!AgcDriver::Graphics::DrawRejection(queue, true).empty(), "a stencil export with unsupported format " + std::to_string(format) + " was accepted");
+    }
     Require(AgcDriver::Graphics::DrawRejection(withExports(9, zExportEnable | maskExportEnable), true).empty(), "a sample-mask export with 32_ABGR was rejected");
     Require(!AgcDriver::Graphics::DrawRejection(withExports(1, zExportEnable | maskExportEnable), true).empty(), "a sample-mask export with 32_R was accepted");
     for (std::uint32_t format = 4; format <= 8; ++format) {
@@ -3049,6 +3058,7 @@ struct ModuleShape {
     bool sampleId = false;
     bool layer = false;
     bool fragDepth = false;
+    std::uint8_t stencilExportValue = 0;
     std::uint32_t sampleMaskLength = 0;
     std::uint32_t floatControlsWidth = 0;
 };
@@ -3138,6 +3148,19 @@ std::vector<std::uint32_t> makeModule(const ModuleShape& shape) {
         emit(annotations, spv::OpDecorate, {variable, spv::DecorationBuiltIn, spv::BuiltInFragDepth});
         extraInterface.push_back(variable);
     }
+    if (shape.stencilExportValue != 0) {
+        const auto intType = id();
+        const auto pointer = id();
+        const auto variable = id();
+        const auto constant = id();
+        emit(declarations, spv::OpTypeInt, {intType, 32, 1});
+        emit(declarations, spv::OpTypePointer, {pointer, spv::StorageClassOutput, intType});
+        emit(declarations, spv::OpVariable, {pointer, variable, spv::StorageClassOutput});
+        emit(annotations, spv::OpDecorate, {variable, spv::DecorationBuiltIn, spv::BuiltInFragStencilRefEXT});
+        extraInterface.push_back(variable);
+        emit(declarations, spv::OpConstant, {intType, constant, shape.stencilExportValue});
+        emit(function, spv::OpStore, {variable, constant});
+    }
     if (shape.sampleMaskLength != 0) {
         const auto length = id();
         const auto array = id();
@@ -3219,6 +3242,15 @@ std::vector<std::uint32_t> makeModule(const ModuleShape& shape) {
     emit(words, spv::OpCapability, {spv::CapabilityShader});
     if (shape.sampleId) emit(words, spv::OpCapability, {spv::CapabilitySampleRateShading});
     if (shape.layer) emit(words, spv::OpCapability, {spv::CapabilityGeometry});
+    if (shape.stencilExportValue != 0) emit(words, spv::OpCapability, {5013});
+    if (shape.stencilExportValue != 0) {
+        const std::string extension = "SPV_EXT_shader_stencil_export";
+        const auto count = (extension.size() + 4) / 4;
+        words.push_back((static_cast<std::uint32_t>(count + 1) << 16u) | spv::OpExtension);
+        const auto start = words.size();
+        words.resize(start + count, 0);
+        for (std::size_t i = 0; i < extension.size(); ++i) words[start + i / 4] |= static_cast<std::uint32_t>(static_cast<unsigned char>(extension[i])) << ((i % 4) * 8);
+    }
     if (shape.barycentric) {
         emit(words, spv::OpCapability, {spv::CapabilityFragmentBarycentricKHR});
         const std::string extension = "SPV_KHR_fragment_shader_barycentric";
@@ -3552,6 +3584,22 @@ void conservativeZExportTests() {
     pixel.spirv = makeModule({.fragment = true, .fragmentMode = spv::ExecutionModeDepthUnchanged});
     expectFailure([&] { AgcDriver::Graphics::ValidateShaders(shaders, state, subgroup, false); }, "unsupported fragment execution mode");
 }
+
+void stencilExportSpirvTests() {
+    constexpr std::uint8_t exportValue = 0x87;
+    const auto spirv = makeModule({.fragment = true, .stencilExportValue = exportValue});
+    bool hasCapability = false, hasExtension = false, hasBuiltin = false;
+    for (std::size_t at = 5; at < spirv.size() && (spirv[at] >> 16u) != 0; at += spirv[at] >> 16u) {
+        const auto op = static_cast<spv::Op>(spirv[at] & 0xffffu);
+        if (op == spv::OpCapability && spirv[at + 1] == 5013) hasCapability = true;
+        if (op == spv::OpExtension && std::string_view(reinterpret_cast<const char*>(&spirv[at + 1])) == "SPV_EXT_shader_stencil_export") hasExtension = true;
+        if (op == spv::OpDecorate && spirv[at + 2] == spv::DecorationBuiltIn && spirv[at + 3] == 5014) hasBuiltin = true;
+    }
+    Require(hasCapability, "stencil export shader missing StencilExportEXT capability");
+    Require(hasExtension, "stencil export shader missing SPV_EXT_shader_stencil_export extension");
+    Require(hasBuiltin, "stencil export shader missing FragStencilRefEXT builtin");
+}
+
 
 constexpr std::array<std::uint32_t, 5> OrderedPixelCode{0x7e0e02f2u, 0xbf900007u, 0xf800180fu, 0x07070707u, 0xbf810000u};
 constexpr std::array<std::uint32_t, 12> OrderedBdaPixelCode{0x7e040f00u, 0x7e060280u, 0xdc208001u, 0x047d0002u, 0xdc308008u, 0x057d0002u, 0xbf8c3f70u, 0x4a080b04u, 0x7e0e0d04u, 0xf800180fu, 0x07070707u, 0xbf810000u};
@@ -4704,6 +4752,7 @@ int main(int argc, char** argv) {
         unorm10_11_11TargetTests();
         DepthBoundsBiasTests();
         conservativeZExportTests();
+        stencilExportSpirvTests();
         orderedPixelShaderTests();
         ProvokingVertexTests();
         ProvokingVertexRenderPassTests();
