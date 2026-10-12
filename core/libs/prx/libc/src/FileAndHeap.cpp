@@ -200,7 +200,6 @@ size_t APS5_VABI fread_nid_postfix(void* buffer, size_t size, size_t count, File
     if (!destination.Open()) throw std::runtime_error("fread: buffer is not writable");
     const auto result = std::fread(buffer, size, count, handle);
     stream->SyncStatus();
-    if (std::ferror(handle)) throw std::runtime_error("fread: read failed");
     return result;
 }
 
@@ -210,7 +209,6 @@ size_t APS5_VABI fwrite_nid_postfix(const void* buffer, size_t size, size_t coun
     if (!buffer) throw std::runtime_error("fwrite: null buffer");
     const auto result = std::fwrite(buffer, size, count, handle);
     stream->SyncStatus();
-    if (result != count || std::ferror(handle)) throw std::runtime_error("fwrite: write failed");
     return result;
 }
 
@@ -267,13 +265,14 @@ void APS5_VABI rewind_nid_postfix(FileStream* stream) {
 int APS5_VABI fputs_nid_postfix(const char* str, FileStream* stream) {
     if (!str) throw std::runtime_error("fputs: null string");
     const int result = std::fputs(str, GetNativeStream(stream));
-    if (result == EOF) throw std::runtime_error("fputs: write failed");
+    stream->SyncStatus();
     return result;
 }
 
 int APS5_VABI fflush_nid_postfix(FileStream* stream) {
-    if (std::fflush(stream ? GetNativeStream(stream) : nullptr) != 0) throw std::runtime_error("fflush: flush failed");
-    return 0;
+    const int result = std::fflush(stream ? GetNativeStream(stream) : nullptr);
+    if (stream) stream->SyncStatus();
+    return result;
 }
 
 int APS5_VABI malloc_stats_fast_nid_postfix(void* stats) {
